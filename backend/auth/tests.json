@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request for CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Register without invite should fail",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "register",
+        "username": "testuser",
+        "displayName": "Test User",
+        "password": "testpass123"
+      },
+      "expectedStatus": 403,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with invalid credentials should fail",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login",
+        "username": "nonexistent",
+        "password": "wrongpass"
+      },
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

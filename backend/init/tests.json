@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request for CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Check initialization status",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "initialized": "boolean",
+        "userCount": "number"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

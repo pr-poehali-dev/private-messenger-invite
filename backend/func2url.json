@@ -1,0 +1,7 @@
+{
+  "init": "https://functions.poehali.dev/209a2754-1be3-4d5f-8ac7-d7ac18ab33ad",
+  "auth": "https://functions.poehali.dev/655bad2e-5122-4932-94d0-6871a147fce2",
+  "chats": "https://functions.poehali.dev/7d37fe61-d169-4ffd-96d6-8b740cd2804a",
+  "invites": "https://functions.poehali.dev/d044ce71-63fa-4ad4-8a0f-ba86c89830bc",
+  "users": "https://functions.poehali.dev/d4006d9f-ef4e-4209-8d55-2a631cb623a5"
+}

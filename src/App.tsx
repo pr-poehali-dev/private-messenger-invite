@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Auth from "./pages/Auth";
 import Messenger from "./pages/Messenger";
+import InitSetup from "./pages/InitSetup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,7 +20,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/auth" replace />} />
+            <Route path="/" element={<Navigate to="/init" replace />} />
+            <Route path="/init" element={<InitSetup />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/messenger" element={<Messenger />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -1,39 +1,83 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { MainSidebar } from '@/components/messenger/MainSidebar';
 import { ChatSidebar } from '@/components/messenger/ChatSidebar';
 import { ChatHeader } from '@/components/messenger/ChatHeader';
 import { MessageList } from '@/components/messenger/MessageList';
 import { MessageInput } from '@/components/messenger/MessageInput';
-import { mockChats, mockMessages, mockUsers, currentUser } from '@/lib/mockData';
-import { Message } from '@/types';
+import { AdminPanel } from '@/components/messenger/AdminPanel';
 import { Card } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
+import { useAuth } from '@/hooks/useAuth';
+import { useChats, useMessages } from '@/hooks/useChats';
+import { invitesApi, usersApi } from '@/lib/api';
+import { User, Invite } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Messenger() {
-  const navigate = useNavigate();
+  const { currentUser, isLoading: authLoading, logout } = useAuth();
+  const { chats, isLoading: chatsLoading, refetch: refetchChats } = useChats();
+  const { toast } = useToast();
   const [activeView, setActiveView] = useState<'chats' | 'profile' | 'admin' | 'members'>('chats');
-  const [selectedChatId, setSelectedChatId] = useState<string | undefined>(mockChats[0]?.id);
-  const [messages, setMessages] = useState(mockMessages);
+  const [selectedChatId, setSelectedChatId] = useState<string | undefined>();
   const [showMobileSidebar, setShowMobileSidebar] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  
+  const { messages, sendMessage, refetch: refetchMessages } = useMessages(selectedChatId);
 
-  const selectedChat = mockChats.find(c => c.id === selectedChatId);
-  const chatMessages = messages.filter(m => m.chatId === selectedChatId);
-  const otherUser = selectedChat?.participants.find(p => p.id !== currentUser.id);
+  const selectedChat = chats.find(c => c.id === selectedChatId);
+  const otherUser = selectedChat?.participants.find(p => p.id !== currentUser?.id);
 
-  const handleSendMessage = (body: string) => {
-    if (!selectedChatId) return;
+  useEffect(() => {
+    if (chats.length > 0 && !selectedChatId) {
+      setSelectedChatId(chats[0].id);
+    }
+  }, [chats]);
 
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      chatId: selectedChatId,
-      senderId: currentUser.id,
-      body,
-      createdAt: new Date(),
-      status: 'sent',
-    };
+  useEffect(() => {
+    if (activeView === 'members') {
+      loadUsers();
+    } else if (activeView === 'admin' && currentUser?.isAdmin) {
+      loadInvites();
+    }
+  }, [activeView]);
 
-    setMessages([...messages, newMessage]);
+  const loadUsers = async () => {
+    try {
+      const response = await usersApi.listUsers();
+      setUsers(response.users || []);
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const loadInvites = async () => {
+    try {
+      const response = await invitesApi.listInvites();
+      setInvites(response.invites || []);
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSendMessage = async (body: string) => {
+    try {
+      await sendMessage(body);
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка отправки',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleChatSelect = (chatId: string) => {
@@ -45,9 +89,50 @@ export default function Messenger() {
     setShowMobileSidebar(true);
   };
 
-  const handleLogout = () => {
-    navigate('/auth');
+  const handleCreateInvite = async (maxUses: number, daysValid: number) => {
+    try {
+      await invitesApi.createInvite(maxUses, daysValid);
+      await loadInvites();
+      toast({
+        title: 'Инвайт создан',
+        description: 'Пригласительная ссылка готова',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    try {
+      await invitesApi.revokeInvite(inviteId);
+      await loadInvites();
+      toast({
+        title: 'Инвайт отозван',
+        description: 'Ссылка больше не действует',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (authLoading || !currentUser) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full gradient-primary animate-pulse" />
+          <p className="text-muted-foreground">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (activeView === 'profile') {
     return (
@@ -56,7 +141,7 @@ export default function Messenger() {
           currentUser={currentUser}
           activeView={activeView}
           onViewChange={setActiveView}
-          onLogout={handleLogout}
+          onLogout={logout}
         />
         <div className="flex-1 flex items-center justify-center p-8 bg-background">
           <Card className="w-full max-w-2xl p-8 animate-fade-in">
@@ -85,7 +170,7 @@ export default function Messenger() {
           currentUser={currentUser}
           activeView={activeView}
           onViewChange={setActiveView}
-          onLogout={handleLogout}
+          onLogout={logout}
         />
         <div className="flex-1 p-8 bg-background overflow-auto">
           <div className="max-w-4xl mx-auto">
@@ -93,7 +178,7 @@ export default function Messenger() {
               Участники сообщества
             </h1>
             <div className="grid gap-4 sm:grid-cols-2">
-              {mockUsers.map((user) => (
+              {users.map((user) => (
                 <Card key={user.id} className="p-4 hover:shadow-lg transition-shadow animate-fade-in">
                   <div className="flex items-center gap-4">
                     <div className="relative">
@@ -133,57 +218,18 @@ export default function Messenger() {
           currentUser={currentUser}
           activeView={activeView}
           onViewChange={setActiveView}
-          onLogout={handleLogout}
+          onLogout={logout}
         />
         <div className="flex-1 p-8 bg-background overflow-auto">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Панель администратора
             </h1>
-            
-            <Card className="p-6 animate-fade-in">
-              <h2 className="text-xl font-semibold mb-4">Создать инвайт-ссылку</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Создайте пригласительную ссылку для новых участников
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Макс. использований"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  defaultValue={5}
-                />
-                <input
-                  type="number"
-                  placeholder="Дней до истечения"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  defaultValue={7}
-                />
-              </div>
-              <button className="mt-4 w-full h-10 rounded-md gradient-primary text-white font-medium hover:opacity-90 transition-opacity">
-                Создать ссылку
-              </button>
-            </Card>
-
-            <Card className="p-6 animate-fade-in">
-              <h2 className="text-xl font-semibold mb-4">Активные инвайты</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div>
-                    <code className="text-sm font-mono">abc123xyz</code>
-                    <p className="text-xs text-muted-foreground mt-1">2/5 использований · истекает через 6 дней</p>
-                  </div>
-                  <button className="text-sm text-destructive hover:underline">Отозвать</button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div>
-                    <code className="text-sm font-mono">def456uvw</code>
-                    <p className="text-xs text-muted-foreground mt-1">1/1 использований · использован</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Завершён</span>
-                </div>
-              </div>
-            </Card>
+            <AdminPanel
+              invites={invites}
+              onCreateInvite={handleCreateInvite}
+              onRevokeInvite={handleRevokeInvite}
+            />
           </div>
         </div>
       </div>
@@ -196,12 +242,12 @@ export default function Messenger() {
         currentUser={currentUser}
         activeView={activeView}
         onViewChange={setActiveView}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <div className={`w-80 ${showMobileSidebar ? 'block' : 'hidden'} md:block`}>
         <ChatSidebar
-          chats={mockChats}
+          chats={chats}
           currentUser={currentUser}
           selectedChatId={selectedChatId}
           onChatSelect={handleChatSelect}
@@ -218,7 +264,7 @@ export default function Messenger() {
               onUserClick={() => {}}
             />
             <MessageList
-              messages={chatMessages}
+              messages={messages}
               currentUserId={currentUser.id}
               otherUser={otherUser}
             />

@@ -7,21 +7,64 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Icon from '@/components/ui/icon';
 import { useTheme } from '@/contexts/ThemeContext';
+import { authApi, setAuthToken, setRefreshToken } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
   const inviteToken = searchParams.get('invite');
   
   const [isLogin, setIsLogin] = useState(!inviteToken);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/messenger');
+    setIsLoading(true);
+
+    try {
+      if (isLogin) {
+        const response = await authApi.login(username, password);
+        setAuthToken(response.accessToken);
+        setRefreshToken(response.refreshToken);
+        localStorage.setItem('currentUser', JSON.stringify(response.user));
+        toast({
+          title: 'Успешный вход',
+          description: `Добро пожаловать, ${response.user.displayName}!`,
+        });
+      } else {
+        if (!inviteToken) {
+          toast({
+            title: 'Ошибка',
+            description: 'Инвайт-токен отсутствует',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const response = await authApi.register(username, displayName, password, inviteToken);
+        setAuthToken(response.accessToken);
+        setRefreshToken(response.refreshToken);
+        localStorage.setItem('currentUser', JSON.stringify(response.user));
+        toast({
+          title: 'Регистрация успешна',
+          description: `Добро пожаловать в мессенджер, ${response.user.displayName}!`,
+        });
+      }
+      navigate('/messenger');
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Что-то пошло не так',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (inviteToken && !isLogin) {
@@ -92,9 +135,9 @@ export default function Auth() {
                 />
               </div>
 
-              <Button type="submit" className="w-full gradient-primary hover:opacity-90">
+              <Button type="submit" className="w-full gradient-primary hover:opacity-90" disabled={isLoading}>
                 <Icon name="UserPlus" size={18} className="mr-2" />
-                Зарегистрироваться
+                {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
               </Button>
             </form>
 
@@ -203,9 +246,9 @@ export default function Auth() {
               />
             </div>
 
-            <Button type="submit" className="w-full gradient-primary hover:opacity-90">
+            <Button type="submit" className="w-full gradient-primary hover:opacity-90" disabled={isLoading}>
               <Icon name="LogIn" size={18} className="mr-2" />
-              Войти
+              {isLoading ? 'Вход...' : 'Войти'}
             </Button>
           </form>
 
